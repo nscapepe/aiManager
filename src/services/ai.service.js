@@ -1,8 +1,10 @@
 const OpenAI = require('openai');
 const { buildSystemPrompt } = require('../config/prompt');
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.AI_BASE_URL || undefined,
+});
 
 const FALLBACK_REPLY = 'Извините, не совсем понял. Не могли бы вы переформулировать?';
 
