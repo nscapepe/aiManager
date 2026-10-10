@@ -2,6 +2,7 @@ const repo = require('../database/lead.repository');
 const aiService = require('../services/ai.service');
 const leadService = require('../services/lead.service');
 const notificationService = require('../services/notification.service');
+const { isManagerChat, isManagerMode, displayName } = require('../config/manager');
 
 const HISTORY_LIMIT = 20;
 
@@ -51,10 +52,59 @@ async function handleText(ctx) {
   }
 }
 
+function alreadyText(lead) {
+  if (lead.status === 'in_progress') {
+    return `Уже в работе${lead.handled_by_name ? `: ${lead.handled_by_name}` : ''}`;
+  }
+  if (lead.status === 'closed') return 'Заявка уже закрыта';
+  return 'Действие недоступно';
+}
+
+// Нажатие кнопок «Взял в работу» / «Закрыть»
+async function handleLeadAction(ctx) {
+  try {
+    if (!isManagerChat(ctx)) return await ctx.answerCbQuery('Нет доступа');
+
+    const [, action, idText] = ctx.match;
+    const leadId = Number(idText);
+    const managerName = displayName(ctx.from);
+
+    const result =
+      action === 'take'
+        ? await leadService.takeLead(leadId, managerName)
+        : await leadService.closeLead(leadId, managerName);
+
+    if (!result.lead) return await ctx.answerCbQuery('Заявка не найдена');
+
+    if (result.changed) {
+      await ctx.answerCbQuery(action === 'take' ? 'Заявка взята в работу' : 'Заявка закрыта');
+    } else {
+      await ctx.answerCbQuery(alreadyText(result.lead), { show_alert: true });
+    }
+
+    // В любом случае показываем актуальное состояние заявки
+    await notificationService.editLeadCard(ctx, result.lead);
+  } catch (err) {
+    console.error('Ошибка обработки кнопки:', err);
+    await ctx.answerCbQuery('Произошла ошибка').catch(() => {});
+  }
+}
+
 function registerHandlers(bot) {
+  bot.action(/^lead:(take|close):(\d+)$/, handleLeadAction);
+
   bot.on('text', (ctx, next) => {
     if (ctx.chat.type !== 'private') return next();
     if (ctx.message.text.startsWith('/')) return next();
+
+    // Обычные сообщения менеджера не обрабатываем как сообщения клиента
+    if (isManagerMode(ctx)) {
+      return ctx.reply(
+        'Вы подключены как менеджер, поэтому на обычные сообщения я не отвечаю. ' +
+          'Список заявок: /leads'
+      );
+    }
+
     return enqueue(ctx.from.id, () => handleText(ctx));
   });
 }

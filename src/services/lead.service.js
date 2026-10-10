@@ -52,4 +52,25 @@ async function processExtractedData(lead, extracted) {
   return { lead: current, ready: false };
 }
 
-module.exports = { processExtractedData, getMissingFields, isComplete, REQUIRED_FIELDS };
+/**
+ * Менеджер берёт заявку в работу.
+ * @returns {Promise<{changed: boolean, lead: object|null}>} changed=false — статус уже был другим
+ */
+async function takeLead(leadId, managerName) {
+  const changed = Boolean(await repo.takeLead(leadId, managerName));
+  return { changed, lead: await repo.getLeadWithClient(leadId) };
+}
+
+async function closeLead(leadId, managerName) {
+  const changed = Boolean(await repo.closeLead(leadId, managerName));
+  return { changed, lead: await repo.getLeadWithClient(leadId) };
+}
+
+module.exports = {
+  processExtractedData,
+  getMissingFields,
+  isComplete,
+  takeLead,
+  closeLead,
+  REQUIRED_FIELDS,
+};

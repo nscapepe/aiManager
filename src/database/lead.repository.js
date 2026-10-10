@@ -1,6 +1,8 @@
 const { pool } = require('./pool');
 
 const LEAD_FIELDS = ['name', 'phone', 'service', 'details'];
+const OPEN_STATUSES = ['ready', 'sent', 'in_progress'];
+const ALL_STATUSES = [...OPEN_STATUSES, 'closed'];
 
 async function upsertClient(from) {
   const { rows } = await pool.query(
@@ -87,6 +89,28 @@ async function markSent(leadId) {
   return rows[0] || null;
 }
 
+// sent -> in_progress. Атомарно: если заявку уже взял другой менеджер, вернётся null
+async function takeLead(leadId, managerName) {
+  const { rows } = await pool.query(
+    `UPDATE leads
+     SET status = 'in_progress', handled_by_name = $2, handled_at = now(), updated_at = now()
+     WHERE id = $1 AND status IN ('ready', 'sent') RETURNING id`,
+    [leadId, managerName]
+  );
+  return rows[0] || null;
+}
+
+// sent / in_progress -> closed
+async function closeLead(leadId, managerName) {
+  const { rows } = await pool.query(
+    `UPDATE leads
+     SET status = 'closed', closed_by_name = $2, closed_at = now(), updated_at = now()
+     WHERE id = $1 AND status IN ('ready', 'sent', 'in_progress') RETURNING id`,
+    [leadId, managerName]
+  );
+  return rows[0] || null;
+}
+
 async function getLeadWithClient(leadId) {
   const { rows } = await pool.query(
     `SELECT l.*, c.telegram_id, c.username, c.first_name
@@ -95,6 +119,19 @@ async function getLeadWithClient(leadId) {
     [leadId]
   );
   return rows[0] || null;
+}
+
+// Список заявок для менеджера (без черновиков)
+async function getLeads({ onlyOpen = false, limit = 10 } = {}) {
+  const { rows } = await pool.query(
+    `SELECT l.*, c.telegram_id, c.username, c.first_name
+     FROM leads l JOIN clients c ON c.id = l.client_id
+     WHERE l.status = ANY($1)
+     ORDER BY l.id DESC
+     LIMIT $2`,
+    [onlyOpen ? OPEN_STATUSES : ALL_STATUSES, limit]
+  );
+  return rows;
 }
 
 // Заявки, которые «зависли» в ready дольше минуты
@@ -116,6 +153,9 @@ module.exports = {
   updateLead,
   markReady,
   markSent,
+  takeLead,
+  closeLead,
   getLeadWithClient,
+  getLeads,
   getStaleReadyLeadIds,
 };
