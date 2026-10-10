@@ -1,6 +1,6 @@
 const repo = require('../database/lead.repository');
 
-const REQUIRED_FIELDS = ['name', 'phone', 'service'];
+const REQUIRED_FIELDS = ['name', 'service'];
 const EXTRACTABLE_FIELDS = ['name', 'phone', 'service', 'details'];
 
 function cleanString(value) {
@@ -9,17 +9,8 @@ function cleanString(value) {
   return trimmed || null;
 }
 
-function isValidPhone(phone) {
-  const digits = String(phone || '').replace(/\D/g, '');
-  return digits.length >= 10 && digits.length <= 15;
-}
-
 function getMissingFields(lead) {
-  return REQUIRED_FIELDS.filter((field) => {
-    if (!lead[field]) return true;
-    if (field === 'phone' && !isValidPhone(lead.phone)) return true;
-    return false;
-  });
+  return REQUIRED_FIELDS.filter((field) => !lead[field]);
 }
 
 function isComplete(lead) {

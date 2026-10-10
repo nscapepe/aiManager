@@ -134,6 +134,15 @@ async function getLeads({ onlyOpen = false, limit = 10 } = {}) {
   return rows;
 }
 
+// Черновики, где клиент уже что-то сообщил, но заявка ещё не собрана
+async function countIncompleteDrafts() {
+  const { rows } = await pool.query(
+    `SELECT count(*)::int AS count FROM leads
+     WHERE status = 'draft' AND (name IS NOT NULL OR phone IS NOT NULL OR service IS NOT NULL)`
+  );
+  return rows[0].count;
+}
+
 // Заявки, которые «зависли» в ready дольше минуты
 async function getStaleReadyLeadIds() {
   const { rows } = await pool.query(
@@ -157,5 +166,6 @@ module.exports = {
   closeLead,
   getLeadWithClient,
   getLeads,
+  countIncompleteDrafts,
   getStaleReadyLeadIds,
 };

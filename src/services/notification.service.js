@@ -31,7 +31,7 @@ function formatLead(lead) {
     `📩 Заявка #${lead.id} — ${statusLabel(lead.status)}`,
     '',
     `Имя: ${lead.name}`,
-    `Телефон: ${lead.phone}`,
+    ...(lead.phone ? [`Телефон: ${lead.phone}`] : []),
     `Услуга: ${lead.service}`,
     `Детали: ${lead.details || '—'}`,
     '',
@@ -97,17 +97,23 @@ async function editLeadCard(ctx, lead) {
   }
 }
 
-function formatLeadList(leads, { onlyOpen = false } = {}) {
-  if (!leads.length) return onlyOpen ? 'Незакрытых заявок нет.' : 'Заявок пока нет.';
+function formatLeadList(leads, { onlyOpen = false, draftCount = 0 } = {}) {
+  const draftNote = draftCount
+    ? `\n\nНе завершены (не хватает имени или услуги): ${draftCount}`
+    : '';
+
+  if (!leads.length) {
+    return (onlyOpen ? 'Незакрытых заявок нет.' : 'Заявок пока нет.') + draftNote;
+  }
 
   const items = leads.map(
     (lead) =>
       `#${lead.id} ${statusLabel(lead.status)}\n` +
-      `${lead.name || '—'} · ${lead.phone || '—'} · ${lead.service || '—'}\n` +
+      `${[lead.name, lead.phone, lead.service].filter(Boolean).join(' · ') || '—'}\n` +
       `${contactText(lead)} · ${formatDate(lead.created_at)}`
   );
   const title = onlyOpen ? 'Незакрытые заявки:' : 'Последние заявки:';
-  return `${title}\n\n${items.join('\n\n')}\n\nОткрыть заявку с кнопками: /lead <номер>`;
+  return `${title}\n\n${items.join('\n\n')}\n\nОткрыть заявку с кнопками: /lead <номер>${draftNote}`;
 }
 
 /**

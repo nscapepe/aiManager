@@ -31,8 +31,11 @@ function registerCommands(bot) {
     try {
       const args = ctx.message.text.split(/\s+/).slice(1);
       const onlyOpen = args[0] === 'open';
-      const leads = await repo.getLeads({ onlyOpen, limit: 10 });
-      await ctx.reply(notificationService.formatLeadList(leads, { onlyOpen }));
+      const [leads, draftCount] = await Promise.all([
+        repo.getLeads({ onlyOpen, limit: 10 }),
+        repo.countIncompleteDrafts(),
+      ]);
+      await ctx.reply(notificationService.formatLeadList(leads, { onlyOpen, draftCount }));
     } catch (err) {
       console.error('Ошибка /leads:', err);
       await ctx.reply('Не удалось получить список заявок.').catch(() => {});
